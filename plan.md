@@ -5,25 +5,26 @@
 ## How to use this plan
 
 - Work one phase at a time, in order. The order is deliberate: **measure first** (Phases 1–2),
-  **get data next** (Phases 3–4), and **optimise last** (Phases 5+). See D-006.
+**get data next** (Phases 3–4), and **optimise last** (Phases 5+). See D-006.
 - Each task should fit in one sitting (about 1–3 hours). If it doesn't, split it.
 - Tick tasks with the commit hash: `- [x] 2.3 ... (a1b2c3d)`.
 - Each phase lists **Learn first** (entries in `learnings.md`), an **exit criterion**, and the
-  **companies it signals to**.
+**companies it signals to**.
 - When a phase ends: record its numbers, then update `decisions.md`, `challenges.md` and
-  `learnings.md`. A short public post is optional but worth doing.
+`learnings.md`. A short public post is optional but worth doing.
 
-**Stack (final, see decisions.md):** Python 3.12 · Pipecat · SmallWebRTC + Twilio · FastAPI ·
-STT: Sarvam, Deepgram · TTS: Sarvam Bulbul, Cartesia · LLM: Gemini Flash (OpenAI fallback) ·
+**Stack (final, see decisions.md):** Python 3.12 · Pipecat · SmallWebRTC (browser; phone numbers later) · FastAPI ·
+STT: Sarvam, Deepgram · TTS: Sarvam Bulbul, Cartesia · LLM: Gemini Flash (Sarvam LLM fallback) ·
 Silero VAD + Smart Turn · Postgres + Redis · OpenTelemetry + Jaeger + Grafana · Docker Compose · uv / ruff / pytest
 
 ## Milestones (cut lines)
 
 | Milestone | Phases | What you can show | Start applying? |
 |---|---|---|---|
-| **v0: Apply-ready** | 0–4 | Working Hinglish agent, per-turn latency tracing, **public Indic STT benchmark on phone audio** | **Yes, start outreach here** |
+| **v0: Apply-ready** | 0–4 | Working Hinglish agent, per-turn latency tracing, **public Indic STT benchmark on browser and phone-quality audio** | **Yes, start outreach here** |
 | **v1: Core claim** | + 5–6 | Language routing, failover, switch cost: naive vs Swar | Headline result |
-| **v2: Complete** | + 7–12 | Eval harness in CI, turn-taking, tools, real phone number, load/cost numbers, demo video | Full story |
+| **v2: Complete** | + 7–11 | Eval harness in CI, turn-taking, tools, hosted browser demo anyone can try, load/cost numbers, demo video | Full story |
+| **Later** | 12 | Real Indian phone number, outbound calls | After the demo |
 
 Don't wait for v2 to reach out. v0 alone is a credible conversation starter for the India-stack
 and eval companies.
@@ -36,9 +37,24 @@ and eval companies.
 **Learn first:** L-001 audio basics, L-004 asyncio & cancellation, L-009 Pipecat frames & processors.
 
 - [x] 0.1 Merge the README eval sections into one metric set; simplify the README; finalise the stack (C-001, D-003)
-- [ ] 0.2 Project setup with uv: `pyproject.toml`, ruff, pytest + pytest-asyncio, pre-commit, `src/swar/` layout, `.env.example`, `docker-compose.yml` (Postgres, Jaeger, Grafana). Fill in Commands in CLAUDE.md (D-012)
-- [ ] 0.3 Get API keys: Sarvam, Deepgram, Cartesia, Gemini, OpenAI. Check whether Smallest / Gnani offer self-serve API access. Make a table of free credits, rate limits and supported languages (C-006, D-008)
-- [ ] 0.4 Audio playground: record mic → WAV; print sample rate / channels / bit depth; resample 16k → 8k and listen; μ-law encode/decode round trip
+- [x] 0.2 Project setup with uv: `pyproject.toml`, ruff, pytest + pytest-asyncio, pre-commit, `src/swar/` layout, `.env.example`, `infra/docker-compose.yml` (Postgres, Jaeger, Grafana). Fill in Commands in CLAUDE.md (D-012, D-014). _(not committed yet)_
+  - [x] 0.2a Start Docker Desktop, run `make up`, and check that Jaeger (:16686) and Grafana (:3000) open and Grafana's Postgres datasource connects
+- [~] 0.3 Get API keys: Sarvam, Deepgram, Cartesia, Gemini. Make a table of free credits, rate limits and supported languages (C-006, D-008). ~~OpenAI~~: no key; dropped (D-015)
+  - [x] Keys verified (2026-11-10): Deepgram, Cartesia, Gemini work
+  - [x] Sarvam credits added; language ID, LLM (`sarvam-105b`), TTS and STT all verified (C-012)
+  - [ ] Fill in the free-credit amounts in the table below
+  - [ ] Optional: check whether Smallest / Gnani offer self-serve API access
+
+  | Provider | Key | Credits | Hindi | Tamil | Bengali | Notes |
+  |---|---|---|---|---|---|---|
+  | Deepgram (STT) | ✅ | _?_ | ✅ | ✅ | ✅ | Nova-3 streaming lists hi, ta, bn, en-IN, plus a multilingual variant |
+  | Cartesia (TTS) | ✅ | _?_ | 59 voices | 13 voices | 7 voices | API version header `2025-04-16` |
+  | Gemini (LLM) | ✅ | _?_ | n/a | n/a | n/a | Many Flash models available; pin an exact ID, never `-latest` (D-015) |
+  | Sarvam (STT, TTS, LLM) | ✅ | _?_ | ✅ | ✅ | ✅ | `sarvam-105b` is a reasoning model (C-013). STT writes English words in Devanagari. Test calls used REST; live use needs the streaming endpoints |
+- [~] 0.4 Audio playground: record mic → WAV; print sample rate / channels / bit depth; resample 16k → 8k and listen; μ-law encode/decode round trip
+  - [x] `swar/core/audio/pcm.py`: frame sizes, resampling (soxr), G.711 μ-law written by hand, WAV I/O; bit-exact against the reference for all 65,536 inputs
+  - [x] `scripts/audio_playground.py`, checked on a synthetic clip
+  - [ ] **Sehaj:** run `uv run python scripts/audio_playground.py --record 5 --play` with your own Hinglish and listen to the four versions
 - [ ] 0.5 Raw streaming STT, no framework: stream a WAV to Deepgram **and** Sarvam over WebSocket in 20 ms chunks at real-time pace; print partials vs finals with timestamps. (This is the core of the Phase 3 adapters.)
 - [ ] 0.6 Pipecat basics: run an echo bot over SmallWebRTC; write one custom `FrameProcessor` that logs every frame type passing through it (D-004)
 - [ ] 0.7 Read what Pipecat (and LiveKit) already ship for STT/TTS fallback or service switching. Write down how Swar goes beyond it (C-005)
@@ -73,7 +89,7 @@ and eval companies.
 - [ ] 2.3 Postgres schema + Alembic: calls, turns, stage timings
 - [ ] 2.4 Grafana: per-stage latency panels and P50/P95 by provider
 - [ ] 2.5 P50 / P95 / P99 over 30+ turns: **the baseline latency number**
-- [ ] 2.6 Measure Gemini vs OpenAI time-to-first-token on the same prompts (confirms D-008's LLM choice)
+- [ ] 2.6 Measure time-to-first-token for 2–3 Gemini Flash models and Sarvam's LLM on the same Hinglish prompts; pin the winner's exact model ID (D-015). Measure time to the first *spoken* token, not just the first token: reasoning tokens are silent (C-013)
 - [ ] 2.7 Latency budget: split 800 ms across stages and mark which stage is over budget
 
 **Exit:** baseline P50/P95 recorded. You can point at the slowest stage with evidence.
@@ -103,11 +119,11 @@ and eval companies.
 **Learn first:** L-008 WER/CER & Indic text normalisation.
 
 - [ ] 4.1 Test set: about 30–50 clips per mix (Hinglish, Tamil-English, Bengali-English) from your own and friends' recordings, public code-switched datasets (check licences), and TTS-generated clips (tagged separately). Ground-truth transcripts (C-004)
-- [ ] 4.2 Degradation pipeline: 8 kHz, μ-law round trip, noise (traffic, TV, crowd, fan) at several SNRs
+- [ ] 4.2 Two versions of every clip: **browser quality** (16 kHz, light noise) and **phone quality** (8 kHz, μ-law round trip, noise such as traffic, TV, crowd, fan at several SNRs). The demo is browser-only, but phone audio is the hard case target companies live with
 - [ ] 4.3 Runner: every STT × every clip → transcript + time-to-first-partial + time-to-final. Cache results in Postgres
 - [ ] 4.4 Scoring with jiwer: WER, CER, code-switch-span WER, wrong-script rate (normalise first)
 - [ ] 4.5 Results tables + charts → `configs/routing.yaml` (language mix → ranked providers)
-- [ ] 4.6 Write-up: "Which STT handles Indian code-switching on phone audio?" Publish it
+- [ ] 4.6 Write-up: "Which STT handles Indian code-switching on browser and phone audio?" Publish it
 
 **Exit:** routing table generated from benchmark results. ← **v0 milestone**
 **Signals to:** Sarvam, Gnani, Smallest, Deepgram, Bolna, KugelAudio.
@@ -138,7 +154,7 @@ and eval companies.
 - [ ] 6.3 Warm connection pool: keep likely providers' streams open, with keepalive; measure the cost of idle connections
 - [ ] 6.4 Sticky routing with hysteresis; measure the flip-flop rate
 - [ ] 6.5 Speculative dual-streaming while uncertain; keep the winner, cancel the loser cleanly; measure the extra cost
-- [ ] 6.6 Per-call priors: greeting turn, phone-number region, CRM language field
+- [ ] 6.6 Per-call priors: greeting turn, browser language setting, user-profile language field (phone-number region added in 12.5)
 - [ ] 6.7 One consistent multilingual TTS voice per call
 - [ ] 6.8 Paired measurement of switch cost: naive (5.3) vs Swar (C-007)
 
@@ -176,36 +192,43 @@ Comes before turn-taking so that turn-taking work ships with numbers.
 - [ ] 9.3 Filler speech when a tool exceeds about 300 ms, without double-speaking
 - [ ] 9.4 Grounding: the agent may only state dates and amounts that came from tool results (hallucination check in evals)
 - [ ] 9.5 Context management: summarise older turns, keep the prompt short
-- [ ] 9.6 EMI-reminder outbound script
+- [ ] 9.6 EMI-reminder script where the agent speaks first (in the browser; real outbound calls come in 12.3)
 
 **Signals to:** GreyLabs, Skit, Ringg, Edesy, Callab.
 
-## Phase 10: Telephony
+## Phase 10: Scale, cost & public deployment
 
-- [ ] 10.1 Twilio number → Media Streams WebSocket → Pipecat (8 kHz μ-law) (D-007)
-- [ ] 10.2 Exotel Indian number, if KYC works for an individual (C-010). **Start checking this during Phase 4–5**
-- [ ] 10.3 Outbound calls; call recordings to object storage
-- [ ] 10.4 Re-run the benchmark on real phone audio. Was the simulated 8 kHz audio realistic?
-
-**Signals to:** Exotel, Callab, Vapi, Retell, Bolna.
-
-## Phase 11: Scale, cost & deployment
-
-- [ ] 11.1 Deploy with Docker Compose on one VM in an India region (D-012); compare latency against running locally (C-009)
-- [ ] 11.2 Load generator: N concurrent AI callers
-- [ ] 11.3 Calls per worker before P95 degrades; measure event-loop lag
-- [ ] 11.4 Backpressure and graceful degradation under overload
-- [ ] 11.5 Redis for live call state; run more than one worker (D-010)
-- [ ] 11.6 Cost per call minute, including speculative streaming: baseline vs Swar
+- [ ] 10.1 Deploy with Docker Compose on one VM in an India region (D-012); compare latency against running locally (C-009)
+- [ ] 10.2 Make the browser demo reachable from anywhere: HTTPS (browsers only allow the mic on secure pages) + a TURN server so WebRTC works behind home/office NATs and firewalls (C-011)
+- [ ] 10.3 Load generator: N concurrent AI callers
+- [ ] 10.4 Calls per worker before P95 degrades; measure event-loop lag
+- [ ] 10.5 Backpressure and graceful degradation under overload
+- [ ] 10.6 Redis for live call state; run more than one worker (D-010)
+- [ ] 10.7 Cost per call minute, including speculative streaming: baseline vs Swar
 
 **Signals to:** Vapi, Retell, LiveKit, Deepgram, Bolna.
 
-## Phase 12: Ship
+## Phase 11: Ship the browser demo
 
-- [ ] 12.1 Rewrite the README with measured results in place of targets
-- [ ] 12.2 Demo video: one call switching Tamil-English → Hinglish, with a provider failure injected and the latency timeline on screen
-- [ ] 12.3 Technical write-ups (benchmark, switching, turn-taking)
-- [ ] 12.4 Per-company pitch: which part of Swar maps to their product (see table below)
+- [ ] 11.1 Demo page: Pipecat's prebuilt browser client + a live per-turn latency panel (the one custom view D-009 allows)
+- [ ] 11.2 Rewrite the README with measured results in place of targets
+- [ ] 11.3 Demo video: one browser call switching Tamil-English → Hinglish, with a provider failure injected and the latency timeline on screen
+- [ ] 11.4 Technical write-ups (benchmark, switching, turn-taking)
+- [ ] 11.5 Per-company pitch: which part of Swar maps to their product (see table below)
+
+**Exit:** anyone with the link can talk to Swar in their browser. ← **v2 milestone**
+
+## Phase 12: Phone numbers (later, after the browser demo)
+
+Deferred by D-013. The core work doesn't depend on it; it adds the real phone path.
+
+- [ ] 12.1 Choose the provider for an Indian number (Exotel or Twilio India) and check whether KYC works for an individual (C-010). **Start this enquiry during Phases 4–5** so it isn't blocking later
+- [ ] 12.2 Phone audio into the agent: telephony WebSocket → Pipecat (8 kHz μ-law)
+- [ ] 12.3 Real outbound calls (EMI reminders); call recordings to object storage
+- [ ] 12.4 Re-run the benchmark on real phone audio. Was the simulated 8 kHz audio realistic?
+- [ ] 12.5 Add the caller's phone-number region as a routing prior (extends 6.6)
+
+**Signals to:** Exotel, Callab, Retell, Vapi, Bolna.
 
 ---
 
@@ -219,9 +242,9 @@ or need you to frame the project differently.
 |---|---|---|---|
 | **Bolna, Sarvam, Smallest, Gnani** | Strong | Indic code-switching quality, the benchmark, routing across Indian providers | 3, 4, 5, 6 |
 | **Skit, GreyLabs, Ringg, Edesy** | Strong | A real task completed reliably (booking, EMI), telephony, evals | 7, 9, 10 |
-| **Exotel, Callab** | Strong | Telephony, phone integration, 8 kHz audio, failover | 5, 10 |
+| **Exotel, Callab** | Medium until Phase 12 | Telephony and phone integration come after the browser demo; the 8 kHz benchmark and failover still count | 4, 5, 12 |
 | **Hamming, Cekura, Roark, Coval, Bluejay, Future AGI** | Strong, **only if Phase 7 is serious** | AI callers, LLM judge, regression in CI, chaos tests, call replay | 2, 5.7–5.8, 7 |
-| **Vapi, Retell** | Strong | Latency engineering, turn-taking, failover, concurrency | 2, 6, 8, 11 |
+| **Vapi, Retell** | Strong | Latency engineering, turn-taking, failover, concurrency | 2, 6, 8, 10 |
 | **Pipecat / Daily** | Strong (we build on Pipecat) | Deep use of the framework, ideally an upstream contribution | 0.6, 3 + stretch, 8 |
 | **LiveKit** | Medium | Realtime/latency skills transfer; the core doesn't depend on Pipecat, so it could be connected to LiveKit Agents | 2, 6, 8 |
 | **Deepgram, Cartesia, ElevenLabs** | Medium | Expert, latency-aware use of their API and an honest benchmark. Relevant to solutions / applied / DevRel roles more than model research | 3, 4, 6 |
@@ -229,6 +252,7 @@ or need you to frame the project differently.
 | **Wavelength** | Weak as is | A consumer companion: naturalness, turn-taking, persona. Routing matters less. Lead with Phase 8 | 8 |
 
 **Takeaways:**
+
 1. The **eval harness (Phase 7) can't be cut**. Six of the 25 companies are testing companies.
 2. Building on **Pipecat** makes the project a strong signal to Daily. The **framework-independent core (D-005)** keeps the LiveKit story open.
 3. A **self-hosted model adapter** (stretch) improves the fit with KugelAudio, Gnani and Smallest.

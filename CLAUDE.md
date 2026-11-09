@@ -79,13 +79,13 @@ The owner is **Sehaj**. It's a learning and portfolio project aimed at voice-AI 
 |---|---|
 | Language | Python 3.12 + asyncio (D-002) |
 | Voice pipeline | Pipecat (D-004) |
-| Transport | SmallWebRTC (dev), Twilio Media Streams (phone), Exotel optional (D-007) |
+| Transport | Browser only via SmallWebRTC, including the public demo; phone numbers in Phase 12 (D-013) |
 | Server | FastAPI (D-010) |
 | STT | Sarvam, Deepgram (+ Smallest / Gnani if access) (D-008) |
 | TTS | Sarvam Bulbul, Cartesia (D-008) |
-| LLM | Gemini Flash-tier primary, OpenAI mini-tier fallback (D-008) |
+| LLM | Gemini Flash primary, Sarvam LLM fallback; exact model IDs pinned (D-015) |
 | VAD / turn | Silero VAD, Smart Turn (D-011) |
-| Storage | Postgres (SQLAlchemy 2.0 async + Alembic), Redis from Phase 11 (D-010) |
+| Storage | Postgres (SQLAlchemy 2.0 async + Alembic), Redis from Phase 10 (D-010) |
 | Observability | OpenTelemetry → Jaeger, Postgres → Grafana (D-009) |
 | Evals | jiwer, pytest, LLM judge, GitHub Actions |
 | Infra / tooling | Docker Compose on one India-region VM; uv, ruff, pytest-asyncio, pre-commit (D-012) |
@@ -102,8 +102,9 @@ src/swar/
   turn/            # turn detection, backchannel classifier
   agent/           # prompts, tools, filler speech
   tracing/         # OpenTelemetry setup, turn metrics
-  server.py        # FastAPI: WebRTC signalling, Twilio webhooks
+  server.py        # FastAPI: WebRTC signalling (telephony webhooks in Phase 12)
 configs/           # baseline.yaml (frozen), routing.yaml, ...
+scripts/           # dev tools and playgrounds (output goes to out/, gitignored)
 bench/             # mini Indic STT benchmark
 evals/             # scenarios, AI callers, judge, `make eval`
 infra/             # docker-compose, Grafana dashboards
@@ -112,4 +113,19 @@ tests/
 
 ## Commands
 
-_To be filled in during plan 0.2 (install, run agent, test, lint, `make eval`)._
+```bash
+make install   # uv sync + install the git pre-commit hook
+make check     # lint + tests: what CI runs. Run before every commit
+make test      # uv run pytest   (single test: uv run pytest tests/test_config.py -k name)
+make format    # ruff auto-fix + format
+make up        # Postgres :5432 · Jaeger UI :16686 (OTLP :4317) · Grafana :3000 (admin/admin)
+make down      # stop infra (data kept in Docker volumes)
+cp .env.example .env   # then add API keys
+uv run python scripts/audio_playground.py --record 5 --play   # hear what phone audio does
+```
+
+- Add dependencies with `uv add <pkg>` (or `uv add --dev <pkg>`), never `pip install`. Commit `uv.lock`.
+- Settings come from `swar.config.get_settings()`. Use `settings.require("deepgram_api_key")` for a
+  clear error when a key is missing.
+- Architecture rules are enforced as tests in `tests/test_architecture.py`. Add a test when adding a rule.
+- Running the agent and `make eval` are added in Phases 1 and 7.

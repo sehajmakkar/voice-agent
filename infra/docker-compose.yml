@@ -1,0 +1,48 @@
+# Local infrastructure for development. Start with `make up`.
+#   Postgres  localhost:5432   calls, turns, stage timings, bookings
+#   Jaeger    localhost:16686  per-turn trace waterfalls (OTLP in on 4317 gRPC / 4318 HTTP)
+#   Grafana   localhost:3000   latency dashboards over Postgres (login admin / admin)
+
+name: swar
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: swar
+      POSTGRES_PASSWORD: swar
+      POSTGRES_DB: swar
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swar -d swar"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  jaeger:
+    image: jaegertracing/jaeger:2.0.0
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  grafana-data:

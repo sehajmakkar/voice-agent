@@ -49,7 +49,7 @@ Good interview material: "tell me about a hard problem you solved" answers come 
   - TTS-generated audio is cheap but clean and synthetic. It may favour TTS-like speech and flatter some providers.
   - Your own and friends' recordings are realistic but slow to collect, and covering Tamil and Bengali needs native speakers.
   - Public code-switching datasets exist, but licences and recording conditions vary.
-- **Mitigation:** mix the sources, tag every clip by source, report results per source, and re-check against real phone audio in plan 10.4.
+- **Mitigation:** mix the sources, tag every clip by source, report results per source, and re-check against real phone audio in plan 12.4.
 
 ## C-005: The frameworks may already ship provider fallback
 - **Date:** 2026-11-06 · **Phase / task:** plan 0.7 · **Raised by:** Claude · **Status:** Open
@@ -57,7 +57,7 @@ Good interview material: "tell me about a hard problem you solved" answers come 
 - **Action:** in plan 0.7, read exactly what exists and write down the gap. Likely differentiators: **language-aware** routing (not just failure-based), switching *mid-utterance* with replay and 0 lost words, health scores based on latency rather than only errors, and the measured < 50 ms overhead.
 
 ## C-006: Provider cost and free-credit limits
-- **Date:** 2026-11-06 · **Phase / task:** plan 0.3, 6.5, 11.5 · **Raised by:** Claude · **Status:** Open
+- **Date:** 2026-11-06 · **Phase / task:** plan 0.3, 6.5, 10.7 · **Raised by:** Claude · **Status:** Open
 - **Problem:** benchmarks (every provider × every clip × several noise levels), speculative dual-streaming (roughly double STT cost during uncertainty), warm idle connections and synthetic-caller evals all burn credits.
 - **Mitigation:** record a credits/limits table in 0.3, cache benchmark results (never re-transcribe the same clip+provider+config), use small eval suites in CI, and report the cost of speculation honestly (metric 8).
 
@@ -75,11 +75,30 @@ Good interview material: "tell me about a hard problem you solved" answers come 
 - **Lesson:** use the framework for the plumbing, and own the part that is your actual product.
 
 ## C-009: Network distance to providers eats the latency budget
-- **Date:** 2026-11-07 · **Phase / task:** plan 2.7, 11.1 · **Raised by:** Claude · **Status:** Open
+- **Date:** 2026-11-07 · **Phase / task:** plan 2.7, 10.1 · **Raised by:** Claude · **Status:** Open
 - **Problem:** providers' servers are in different regions. Every streaming round trip from the agent to a far-away provider adds latency that no code optimisation can remove, and it differs per provider, which skews the benchmark too.
-- **Approach:** measure the network round trip to each provider separately from processing time (2.7). Deploy in an India region (D-012) and compare against local runs (11.1). Report benchmark latency together with where it was measured from.
+- **Approach:** measure the network round trip to each provider separately from processing time (2.7). Deploy in an India region (D-012) and compare against local runs (10.1). Report benchmark latency together with where it was measured from.
 
 ## C-010: Getting an Indian phone number
-- **Date:** 2026-11-07 · **Phase / task:** plan 10.2 · **Raised by:** Claude · **Status:** Open
+- **Date:** 2026-11-07 · **Phase / task:** plan 12.1 · **Raised by:** Claude · **Status:** Deferred (D-013)
 - **Problem:** Indian numbers (Exotel, or Twilio India) require regulatory and business KYC paperwork, which may not be possible for an individual. A foreign Twilio number works but costs Indian testers international calling.
-- **Approach:** Twilio first (D-007); start the Exotel enquiry during Phase 4–5 so it isn't blocking later. The browser (WebRTC) demo works regardless.
+- **Approach:** 2026-11-10: Sehaj moved phone numbers after the browser demo (D-013), so this is off the critical path. Still start the Exotel / Twilio India KYC enquiry during Phases 4–5 so it's ready when Phase 12 starts.
+
+## C-011: A public browser demo needs HTTPS and a TURN server
+- **Date:** 2026-11-10 · **Phase / task:** plan 10.2 · **Raised by:** Claude · **Status:** Open
+- **Problem:** browsers only allow microphone access on HTTPS pages (or localhost). And peer-to-peer WebRTC from a visitor's browser to our VM often fails behind home routers, office firewalls and mobile networks (NAT), so it works on localhost and then breaks for real users.
+- **Options & trade-offs:** run our own TURN server (coturn; free, but one more thing to operate and it relays audio, which adds a hop) · a managed TURN service (simple, small cost) · switch the public demo to a hosted WebRTC provider such as Daily (most reliable, adds an account, ties the demo to that service).
+- **Approach:** decide in 10.2. Measure how much latency the TURN relay adds when it's in use.
+
+## C-012: Sarvam account has no credits; model IDs get deprecated
+- **Date:** 2026-11-10 · **Phase / task:** plan 0.3 · **Raised by:** found while verifying keys · **Status:** Resolved 2026-11-10 (credits added; all Sarvam APIs verified)
+- **Problem:** the Sarvam key is valid, but every paid call returns `402 insufficient_quota_error: No credits available`. Sarvam is the Indian-language specialist in the routing design, so this blocks the Sarvam part of 0.5, the Sarvam adapters (3.2, 3.4) and half of the benchmark (Phase 4). Separately, the LLM model `sarvam-m` has been deprecated in favour of `sarvam-105b`.
+- **Not blocked:** 0.4, Deepgram streaming in 0.5, 0.6, and all of Phases 1–2 (the baseline can run on Deepgram + Gemini + Cartesia).
+- **Lesson:** providers deprecate model IDs without warning. Pin IDs in config, and let the contract tests (3.6) fail loudly when a model disappears.
+
+## C-013: Reasoning LLMs add silent latency before the first spoken word
+- **Date:** 2026-11-10 · **Phase / task:** plan 2.6, D-015 · **Raised by:** found while verifying Sarvam · **Status:** Open
+- **Problem:** `sarvam-105b` is a reasoning model. On a one-line Hinglish question, 156 of its 219 output tokens were hidden reasoning, and the whole reply took 1.14 s. In a voice agent, reasoning tokens are pure dead air: the caller hears nothing until the first *answer* token reaches TTS. Its reply was also in a formal, Urdu-heavy register ("makhsoos auqaat", "barah-e-raast") rather than everyday Hinglish.
+- **Why it matters:** "time to first token" from the API can look fast while the time to the first *spoken* token is slow. Reasoning models are also a poor fit as a *fallback*, which is supposed to rescue a slow turn.
+- **Options:** turn reasoning off or down if the API allows it · use a non-reasoning model for the fallback · keep Sarvam's LLM for non-realtime work (judging, summarising) only.
+- **Next step:** measure it properly in 2.6; revisit D-015 with the numbers. Register and language style are handled by the voice prompt (1.2).

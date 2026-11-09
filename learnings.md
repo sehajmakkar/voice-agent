@@ -25,8 +25,11 @@ questions it prepares you for, and where to read more (official docs first).
 - **Interview questions:**
   - How many bytes is a 20 ms frame of 16 kHz, 16-bit mono PCM? *(320 samples × 2 bytes = 640 bytes)*
   - Why does phone audio hurt STT accuracy, and what can you do about it?
-  - Should you resample 8 kHz → 16 kHz before sending to an STT trained on 16 kHz?
-- **References:** Twilio Media Streams docs (audio format) · Wikipedia: μ-law algorithm, Nyquist–Shannon sampling theorem
+  - Should you resample 8 kHz → 16 kHz before sending to an STT trained on 16 kHz? *(It matches the model's input format, but it can't restore the lost 4–8 kHz band; listen to `4_phone_back_to_16k.wav`)*
+  - How would you test a codec implementation? *(Exhaustively against a reference: there are only 65,536 inputs)*
+- **Gotcha we hit (plan 0.4):** the standard μ-law encoder first drops samples to 14 bits with `x >> 2`. On negative numbers an arithmetic shift rounds towards −∞ (`-5 >> 2 == -2`), so negative samples come out slightly larger. Ignoring that put 381 of 65,536 values one step off. An exhaustive test against a reference implementation caught it; a few hand-picked test values would not have.
+- **Measured on a test clip:** μ-law round trip ≈ 38 dB SNR; 8 kHz sampling removed 22.5% of the energy (everything above 4 kHz); bandwidth goes from 256 kbps (16 kHz PCM) to 64 kbps (8 kHz μ-law).
+- **References:** ITU-T G.711 · Wikipedia: μ-law algorithm, Nyquist–Shannon sampling theorem · Twilio Media Streams docs (audio format)
 
 ## L-002: The streaming voice pipeline  `[ ]`
 - **Phase / task:** plan 1.1
@@ -94,6 +97,7 @@ questions it prepares you for, and where to read more (official docs first).
 ## L-008: WER / CER and Indic text normalisation  `[ ]`
 - **Phase / task:** plan 4.4
 - **What it is:** WER = (substitutions + deletions + insertions) / reference words. CER is the same at character level. Before scoring you must *normalise* text (case, punctuation, numbers, and script: "kal" vs "कल").
+- **Real example (plan 0.3):** Sarvam STT on "Aapka appointment kal subah das baje ka hai" returned `आपका अपॉइंटमेंट कल सुबह 10 बजे का है।`: the English word *appointment* in Devanagari, and "das" as the digit `10`. Both are "correct", but a naive WER against a Latin-script or words-only reference would count them as errors.
 - **Why it mattered:** CER is often fairer for Indic languages (word segmentation and spelling vary). Without script normalisation, a provider writing Hindi in Latin script looks "wrong" when it's actually right, so the benchmark (and the routing table built from it) would be misleading.
 - **Interview questions:**
   - Why might CER be better than WER for Indic languages?
@@ -112,13 +116,14 @@ questions it prepares you for, and where to read more (official docs first).
 - **References:** Pipecat docs (docs.pipecat.ai): core concepts, custom frame processors
 
 ## L-010: WebRTC vs WebSockets for realtime audio  `[ ]`
-- **Phase / task:** plan 1.1, 10.1
-- **What it is:** WebRTC sends audio over UDP, with a jitter buffer, packet-loss handling, echo cancellation and the Opus codec built in. It's designed for live media. WebSockets run over TCP: simple and reliable, but a lost packet stalls everything behind it (head-of-line blocking). Telephony bridges such as Twilio Media Streams send 8 kHz μ-law audio to your server over a WebSocket.
-- **Why it mattered:** browser calls use WebRTC (SmallWebRTC); phone calls arrive over a Twilio WebSocket; provider STT/TTS APIs are WebSockets too. The same agent must handle both kinds of input (D-007).
+- **Phase / task:** plan 1.1, 10.2, 12.2
+- **What it is:** WebRTC sends audio over UDP, with a jitter buffer, packet-loss handling, echo cancellation and the Opus codec built in. It's designed for live media. WebSockets run over TCP: simple and reliable, but a lost packet stalls everything behind it (head-of-line blocking). Telephony bridges such as Twilio Media Streams send 8 kHz μ-law audio to your server over a WebSocket. To connect two peers through home routers and firewalls (NAT), WebRTC uses ICE: STUN to discover a public address, and TURN to relay the audio when a direct path fails.
+- **Why it mattered:** the whole demo is browser WebRTC (SmallWebRTC), and a public demo needs TURN (C-011). Provider STT/TTS APIs are WebSockets, and phone calls (Phase 12) will arrive over a telephony WebSocket (D-013).
 - **Interview questions:**
   - Why is WebRTC preferred over WebSockets for audio from a user's device?
   - What is head-of-line blocking, and why does it matter for realtime audio?
   - What does a jitter buffer do, and what does it cost in latency?
+  - What are STUN and TURN, and why does a WebRTC app that works on localhost fail for real users?
 - **References:** MDN WebRTC API docs · Twilio Media Streams docs · webrtcforthecurious.com
 
 ---
@@ -130,3 +135,13 @@ questions it prepares you for, and where to read more (official docs first).
 - How would you evaluate a voice agent before shipping a prompt change? (regression evals in CI)
 - How would you route between several ML providers using live quality and latency signals?
 - How do you test a system whose inputs are realistic, messy human conversations? (synthetic callers, replay)
+
+## L-011: Reproducible Python projects: src layout, lockfiles, enforced boundaries  `[ ]`
+- **Phase / task:** plan 0.2
+- **What it is:** a *src layout* (`src/swar/`) means tests import the installed package, not files that happen to be in the working directory, so packaging bugs show up locally instead of in production. A *lockfile* (`uv.lock`) pins every direct and transitive dependency to an exact version and hash, so every machine gets the same environment. *Architecture tests* turn design rules ("core never imports the framework") into failing tests instead of conventions people forget.
+- **Why it mattered:** the same code has to behave identically on a laptop, in CI and on the VM. D-005's framework-independence is only real if something checks it.
+- **Interview questions:**
+  - What's the difference between the dependency ranges in `pyproject.toml` and a lockfile? Why do you need both?
+  - How would you stop a team from breaking a layering rule in a growing codebase?
+  - Why might tests pass locally but the package fail once installed?
+- **References:** uv docs: projects & lockfile (docs.astral.sh/uv) · Python Packaging User Guide: "src layout vs flat layout"

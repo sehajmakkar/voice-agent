@@ -2,7 +2,7 @@
 
 **A voice agent for Indian callers that uses the best speech model for each language, and switches between models mid-call without the caller noticing.**
 
-Swar is a working voice agent (clinic appointment booking and EMI payment reminders) that you can talk to in the browser or over the phone. On top of the agent is a reliability layer. That layer is the real project.
+Swar is a working voice agent (clinic appointment booking and EMI payment reminders) that you talk to in the browser (Indian phone numbers come later). On top of the agent is a reliability layer. That layer is the real project.
 
 ---
 
@@ -25,13 +25,13 @@ Voice agents in production rarely fail because the AI models are bad. They fail 
 - **Keeps talking while it works.** It says something natural while a booking is being made.
 - **Measures every turn**, so you can see exactly which step was slow.
 
-The routing is based on data: a small benchmark of each provider on noisy, phone-quality Indian audio decides which provider gets which language mix.
+The routing is based on data: a small benchmark of each provider on Indian audio, in both browser quality and noisy phone quality, decides which provider gets which language mix.
 
 ## How switching stays fast
 
 | Technique | What it does |
 |---|---|
-| **Early language detection** | Decides from the greeting, the caller's phone region and the first ~0.5 s of speech, not after the sentence ends |
+| **Early language detection** | Decides from the greeting, the caller's language settings and the first ~0.5 s of speech, not after the sentence ends |
 | **Warm connections** | Keeps connections to likely providers open, so a switch skips 100–300 ms of connection setup |
 | **Audio replay buffer** | Keeps the last few seconds of audio and replays it to the new provider, so no words are lost |
 | **Speculative streaming** | When unsure, sends audio to two providers for a moment and keeps the better result |
@@ -48,15 +48,15 @@ Every number is compared against a **baseline**: the same agent using one provid
 |---|---|---|
 | **Response time** | From the moment the caller stops speaking, how long until the agent starts speaking? (P50 / P95) | < 800 ms / < 1.2 s |
 | **Switch cost** | How much time does a provider switch add, and are any words lost? | < 50 ms, 0 words lost |
-| **Transcription accuracy** | How many words are wrong, per language mix, on phone audio? (WER / CER) | Better than the best single provider |
+| **Transcription accuracy** | How many words are wrong, per language mix, on browser and phone-quality audio? (WER / CER) | Better than the best single provider |
 | **Failover** | When a provider fails mid-call, how fast does Swar recover, and how often is there more than 1.5 s of silence? | < 300 ms recovery, < 1% of turns |
 | **Turn-taking** | How often does the agent cut the caller off, or stop for a "haan"? | < 5% of turns |
 | **Task success** | Was the booking or reminder actually completed correctly? | > 90% of calls |
 | **Cost** | What does one minute of a call cost, including the extra cost of switching? | Reported vs baseline |
 
 **How the tests run**
-- **Test calls:** about 50 per language mix (Hinglish, Tamil-English, Bengali-English), recorded or generated, then converted to noisy 8 kHz phone-quality audio.
-- **AI callers:** LLM-driven callers phone the agent, switch languages, pause, interrupt and say "haan haan".
+- **Test calls:** about 50 per language mix (Hinglish, Tamil-English, Bengali-English), recorded or generated, tested in browser quality and as noisy 8 kHz phone-quality audio.
+- **AI callers:** LLM-driven callers talk to the agent, switch languages, pause, interrupt and say "haan haan".
 - **Chaos tests:** a provider is deliberately slowed down or cut off in the middle of a call.
 - **One command:** `make eval` runs everything and writes a report (baseline vs Swar). CI runs it on every change to routing or turn detection.
 
@@ -65,7 +65,7 @@ Every number is compared against a **baseline**: the same agent using one provid
 ## Architecture
 
 ```
-Caller: browser (WebRTC) or phone (Twilio)
+Caller: browser (WebRTC). Phone numbers come later
   │ audio in                                          ▲ audio out
   ▼                                                   │
 Pipecat pipeline, served by FastAPI
@@ -73,7 +73,7 @@ Pipecat pipeline, served by FastAPI
   2. Swar router: language ID · provider health · failover
                   warm connections · audio replay buffer
        └─► STT adapters: Sarvam · Deepgram
-  3. LLM + tools: Gemini (OpenAI as fallback) · booking tools · filler speech
+  3. LLM + tools: Gemini (Sarvam LLM as fallback) · booking tools · filler speech
   4. Swar router ─► TTS adapters: Sarvam Bulbul · Cartesia ──┘
 
 Every turn ─► OpenTelemetry traces → Jaeger
@@ -89,12 +89,12 @@ The router, the adapters and the replay buffer live in a plain-Python core that 
 |---|---|---|
 | Language | **Python 3.12 + asyncio** | Voice frameworks, provider SDKs and ML tools are all Python |
 | Voice pipeline | **Pipecat** | Built from small processors, so adding our own router, buffer and turn logic is easy. Ships VAD, turn detection, telephony and tracing |
-| Browser calls | **Pipecat SmallWebRTC** | Peer-to-peer WebRTC with no extra account, good for development |
-| Phone calls | **Twilio** (Exotel for Indian numbers, if business KYC allows) | Quickest way to get a working phone number |
-| Server | **FastAPI** | WebRTC signalling, Twilio webhooks, a small API |
+| Browser calls | **Pipecat SmallWebRTC** | Peer-to-peer WebRTC with no extra account; the whole demo runs on it |
+| Phone calls (later) | **Exotel or Twilio India** number, after the browser demo | Keeps phone paperwork and costs out of the way of the core work |
+| Server | **FastAPI** | WebRTC signalling and a small API |
 | Speech-to-text | **Sarvam, Deepgram** (+ Smallest or Gnani if API access works out) | An Indian-language specialist vs a fast global model: the two ends the router chooses between |
 | Text-to-speech | **Sarvam Bulbul, Cartesia** | Natural Indian voices vs very low latency |
-| LLM | **Gemini Flash** (primary), **OpenAI mini model** (fallback) | Fast first token, cheap, handles Hinglish; a second provider allows failover |
+| LLM | **Gemini Flash** (primary), **Sarvam LLM** (fallback) | Fast first token, cheap, handles Hinglish; a second provider allows failover |
 | VAD / turn detection | **Silero VAD, Smart Turn** | Open source, runs on CPU, built into Pipecat |
 | Language ID | Script and word-list checks on partial transcripts, plus an audio language-ID model | Model chosen by measurement in Phase 5 |
 | Storage | **Postgres** (SQLAlchemy + Alembic), **Redis** | Calls, turns and bookings in Postgres; Redis for live call state once there's more than one worker |
@@ -115,15 +115,15 @@ The reasons for each choice, and the alternatives considered, are in [decisions.
 | 1 | Basic agent: one STT, one LLM, one TTS, in the browser | |
 | 2 | Per-turn tracing, baseline latency numbers | |
 | 3 | Provider adapters behind one interface | |
-| 4 | Benchmark of Indian speech-to-text on phone audio | **v0: first public results** |
+| 4 | Benchmark of Indian speech-to-text on browser and phone-quality audio | **v0: first public results** |
 | 5 | Router: language routing, health scores, failover | |
 | 6 | Fast switching: warm connections, replay buffer, speculative streaming | **v1: core result** |
 | 7 | Eval harness: AI callers, LLM judge, `make eval`, CI | |
 | 8 | Turn-taking: semantic end-of-turn, backchannel filter | |
 | 9 | Booking tools, filler speech | |
-| 10 | Real phone number | |
-| 11 | Load test, cost per minute, deployment | |
-| 12 | Demo video and write-up | **v2: complete** |
+| 10 | Public deployment, load test, cost per minute | |
+| 11 | Browser demo anyone can try, demo video, write-up | **v2: complete** |
+| 12 | Indian phone number, outbound calls | Later |
 
 Task-level detail is in [plan.md](plan.md).
 
