@@ -41,6 +41,7 @@ Good interview material: "tell me about a hard problem you solved" answers come 
 - **Why it's hard:** 300–500 ms of audio is often one or two words; code-switch points are unpredictable; 8 kHz noise hurts.
 - **Reframe to consider:** the routing question isn't "which language?" but "which provider will transcribe this best?". The decision may only need the *base* Indic language plus a code-mixing flag.
 - **Options:** transcript heuristics (script + lexicon), audio LID models, priors (region, greeting turn), speculative streaming when unsure. Plan 5.1 vs 5.2 measures this.
+- **Evidence (plan 0.5, 2026-11-10):** in both runs, Deepgram's first partial for "हाँ जी" was tagged **Persian (`fa`)** and partly written in Arabic script; it corrected itself to Hindi one second later. Language tags from the first ~1 s of partials can't be trusted on their own. Also, Sarvam sends no partials at all (C-014), so transcript-based early language ID only works with some providers.
 
 ## C-004: Realistic test audio with ground truth is scarce
 - **Date:** 2026-11-06 · **Phase / task:** plan 4.1 · **Raised by:** Claude · **Status:** Open
@@ -77,7 +78,8 @@ Good interview material: "tell me about a hard problem you solved" answers come 
 ## C-009: Network distance to providers eats the latency budget
 - **Date:** 2026-11-07 · **Phase / task:** plan 2.7, 10.1 · **Raised by:** Claude · **Status:** Open
 - **Problem:** providers' servers are in different regions. Every streaming round trip from the agent to a far-away provider adds latency that no code optimisation can remove, and it differs per provider, which skews the benchmark too.
-- **Approach:** measure the network round trip to each provider separately from processing time (2.7). Deploy in an India region (D-012) and compare against local runs (10.1). Report benchmark latency together with where it was measured from.
+- **Measured (plan 0.5, 2026-11-10, from Sehaj's machine in India):** TCP connect to `api.deepgram.com` took ~280–400 ms (one round trip, which suggests US servers); to `api.sarvam.ai` (AWS Mumbai IP range) ~40 ms. A new WebSocket needs 3–4 round trips, so **Deepgram's connect took 0.9–1.4 s vs Sarvam's ~160 ms**. Every result message from Deepgram also arrives ~150 ms later (one-way delay). This makes the case for warm connections (6.3) and an India-region deployment, and it biases any latency comparison towards Sarvam when measured from India.
+- **Approach:** measure the network round trip to each provider separately from processing time (2.7, 2.9). Deploy in an India region (D-012) and compare against local runs (10.1). Report benchmark latency together with where it was measured from.
 
 ## C-010: Getting an Indian phone number
 - **Date:** 2026-11-07 · **Phase / task:** plan 12.1 · **Raised by:** Claude · **Status:** Deferred (D-013)
@@ -102,3 +104,19 @@ Good interview material: "tell me about a hard problem you solved" answers come 
 - **Why it matters:** "time to first token" from the API can look fast while the time to the first *spoken* token is slow. Reasoning models are also a poor fit as a *fallback*, which is supposed to rescue a slow turn.
 - **Options:** turn reasoning off or down if the API allows it · use a non-reasoning model for the fallback · keep Sarvam's LLM for non-realtime work (judging, summarising) only.
 - **Next step:** measure it properly in 2.6; revisit D-015 with the numbers. Register and language style are handled by the voice prompt (1.2).
+
+## C-014: Sarvam streaming sends no partial transcripts
+- **Date:** 2026-11-10 · **Phase / task:** plan 0.5 · **Raised by:** found while building · **Status:** Open (design input for Phases 5, 6, 8)
+- **Problem:** Deepgram streams partial transcripts every ~1 s while the caller speaks. Sarvam sends nothing until its own voice detector decides the caller paused, then sends the finished segment. In our clip, Sarvam's first text arrived ~6 s after speech started.
+- **Why it matters:** three planned features depend on partials: early language ID from transcripts (5.1), semantic end-of-turn using the partial transcript (8.2), and starting the LLM early. None of these work on Sarvam's stream alone.
+- **Options & trade-offs:** use audio-based language ID instead of transcript-based (5.2) · run a cheap partial-producing provider alongside Sarvam during uncertainty (speculative streaming, 6.5; costs more) · accept that Sarvam turns get a less informed end-of-turn decision.
+- **Next step:** the provider interface (3.1) must expose whether a provider produces partials, so the router and turn controller can adapt.
+
+## C-015: Language-ID tags and script are unstable in early partials
+- **Date:** 2026-11-10 · **Phase / task:** plan 0.5, 4.3 · **Raised by:** found while building · **Status:** Open
+- **Problem:** see the C-003 evidence: first partial tagged Persian in Arabic script, then corrected. Also "दस" vs "10" for the same audio across two runs (Deepgram `smart_format`). Same audio, different text, so benchmarks need several runs per clip and text normalisation before scoring (L-008).
+
+## C-016: "Speech end" was measured as the end of the file, not the end of speech
+- **Date:** 2026-11-10 · **Phase / task:** plan 0.5 → 2.8 · **Raised by:** Claude · **Status:** Open
+- **Problem:** the "speech end → final" numbers in 0.5 treat the last frame of the clip as the moment speech ended. TTS clips carry a little trailing silence, so speech really ended earlier and the true latency is somewhat *higher* than reported.
+- **Fix:** in Phase 2, take speech end from Silero VAD on our side (the same signal the agent uses), not from the file length.

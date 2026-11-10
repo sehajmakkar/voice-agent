@@ -122,6 +122,7 @@ make up        # Postgres :5432 · Jaeger UI :16686 (OTLP :4317) · Grafana :300
 make down      # stop infra (data kept in Docker volumes)
 cp .env.example .env   # then add API keys
 uv run python scripts/audio_playground.py --record 5 --play   # hear what phone audio does
+uv run python scripts/stream_stt.py --input out/clips/hinglish_booking_16k.wav   # live STT, both providers
 ```
 
 - Add dependencies with `uv add <pkg>` (or `uv add --dev <pkg>`), never `pip install`. Commit `uv.lock`.

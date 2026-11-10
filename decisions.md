@@ -147,3 +147,12 @@ Every lasting technical decision: tech stack, architecture, interfaces, metrics,
 - **Decision (proposed):** Gemini Flash primary, Sarvam LLM fallback. A Gemini Flash-Lite model is the stop-gap fallback until Sarvam has credits. LLM failover isn't needed before Phase 5, so nothing is blocked.
 - **Also:** pin exact model IDs in config (e.g. `gemini-3.8-flash`), never aliases like `gemini-flash-latest`. An alias can silently point to a new model and change the frozen baseline. `sarvam-m` being deprecated (C-012) shows that model IDs disappear.
 - **Revisit if:** Sarvam's time to first token in 2.6 is too slow for a fallback.
+
+## D-016: First STT streaming shape: events, a shared base class, keys passed in
+- **Date:** 2026-11-10 · **Status:** Proposed (first version; formalised in plan 3.1) · **Phase / task:** plan 0.5
+- **Event model:** every provider emits `STTEvent(kind, received_at, text, language, endpoint, provider_latency_s)` with `kind` ∈ `partial | final | speech_start | speech_end`. Providers that don't support a kind simply never emit it (Sarvam: no `partial`).
+- **Shared base class** (`StreamingSTT`): owns the WebSocket loop (a background sender task + receive loop + clean cancellation in `finally`). Each provider only supplies URL, headers, audio encoding, finish message and a **pure `parse()` function**. Alternative: each provider writes its own loop (more duplication; cancellation bugs get copied).
+- **Keys are constructor arguments**; `swar.core` never reads settings or `.env` itself. The caller (script, pipeline) decides where keys come from, which keeps core testable and reusable.
+- **Defaults:** Deepgram `nova-3` with `language=multi`, endpointing 300 ms. Sarvam `saaras:v3`, `mode=codemix`, `hi-IN`. Both are starting points to compare in Phase 4.
+- **Fixtures:** raw provider messages are recorded with `--save-raw` and replayed in tests (principle 8).
+- **Open for 3.1:** a `supports_partials` capability flag (C-014); reconnect/keepalive for warm connections (6.3).

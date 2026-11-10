@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=2.5.4",
     "pydantic-settings>=2.6",
     "soxr>=1.1.0",
+    "websockets>=17.4",
 ]
 
 [dependency-groups]

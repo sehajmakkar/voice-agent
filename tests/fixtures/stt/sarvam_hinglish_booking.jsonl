@@ -1,0 +1,6 @@
+{"type": "events", "data": {"signal_type": "START_SPEECH", "occured_at": 1794267013.2706132}}
+{"type": "events", "data": {"signal_type": "END_SPEECH", "occured_at": 1794267019.230625}}
+{"type": "data", "data": {"request_id": "20261109_643cfbb4-d33a-4dc6-b1f1-a55d67d00994", "transcript": "हाँ जी मुझे कल सुबह डॉक्टर के साथ appointment चाहिए preferably दस बजे के आस पास", "timestamps": null, "diarized_transcript": null, "language_code": "hi-IN", "language_probability": null, "audio_hash": null, "audio_mime": null, "metrics": {"audio_duration": 6.56, "processing_latency": 0.13578391075134277}}}
+{"type": "events", "data": {"signal_type": "START_SPEECH", "occured_at": 1794267019.3500903}}
+{"type": "events", "data": {"signal_type": "END_SPEECH", "occured_at": 1794267020.7302368}}
+{"type": "data", "data": {"request_id": "20261109_643cfbb4-d33a-4dc6-b1f1-a55d67d00994", "transcript": "Thursday भी चलेगा।", "timestamps": null, "diarized_transcript": null, "language_code": "hi-IN", "language_probability": null, "audio_hash": null, "audio_mime": null, "metrics": {"audio_duration": 1.792, "processing_latency": 0.046868085861206055}}}

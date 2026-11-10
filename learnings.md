@@ -145,3 +145,14 @@ questions it prepares you for, and where to read more (official docs first).
   - How would you stop a team from breaking a layering rule in a growing codebase?
   - Why might tests pass locally but the package fail once installed?
 - **References:** uv docs: projects & lockfile (docs.astral.sh/uv) · Python Packaging User Guide: "src layout vs flat layout"
+
+## L-012: Streaming STT: partials, finals and endpointing  `[ ]`
+- **Phase / task:** plan 0.5
+- **What it is:** a streaming STT returns *partial* transcripts that can still change ("Preferably ten:" later became "Preferably दस बजे के आसपास") and *final* segments that won't. *Endpointing* is the provider deciding the speaker paused long enough to finalise, which is a silence timer (Deepgram's was 300 ms) or a VAD model.
+- **Why it mattered:** measured speech end → final was ~700–850 ms, but Sarvam reported only 0.05–0.16 s of actual processing. **Most of the "STT latency" is waiting to be sure the caller stopped**, plus the network. So the biggest lever on turn latency is turn detection (Phase 8), not a faster STT model. Connection setup (0.16 s vs 1.4 s) is a separate cost that warm connections remove.
+- **Also applied:** drift-free pacing (absolute deadlines, not repeated `sleep(0.02)`); an async generator that cancels its background sender task in `finally`, so stopping early (e.g. on barge-in) never leaks a task or a socket (L-004).
+- **Interview questions:**
+  - Why can't you just use the time-to-final-transcript of an STT as its "latency"? *(It includes the endpointing wait and network.)*
+  - What do you do with partial transcripts if they can change?
+  - How do you stream audio at real-time pace without drift?
+- **References:** Deepgram docs: Live Streaming, interim results, endpointing · Sarvam docs: Streaming speech-to-text

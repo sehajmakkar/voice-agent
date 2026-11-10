@@ -55,7 +55,16 @@ and eval companies.
   - [x] `swar/core/audio/pcm.py`: frame sizes, resampling (soxr), G.711 μ-law written by hand, WAV I/O; bit-exact against the reference for all 65,536 inputs
   - [x] `scripts/audio_playground.py`, checked on a synthetic clip
   - [ ] **Sehaj:** run `uv run python scripts/audio_playground.py --record 5 --play` with your own Hinglish and listen to the four versions
-- [ ] 0.5 Raw streaming STT, no framework: stream a WAV to Deepgram **and** Sarvam over WebSocket in 20 ms chunks at real-time pace; print partials vs finals with timestamps. (This is the core of the Phase 3 adapters.)
+- [x] 0.5 Raw streaming STT, no framework: stream a WAV to Deepgram **and** Sarvam over WebSocket in 20 ms chunks at real-time pace; print partials vs finals with timestamps. (This is the core of the Phase 3 adapters.) (D-016)
+  - Built: `core/audio/pacing.py` (drift-free real-time pacing), `core/providers/stt/{base,deepgram,sarvam}.py`, `scripts/stream_stt.py`; replay tests on recorded messages in `tests/fixtures/stt/`
+  - **First numbers** (Cartesia-generated 7.5 s Hinglish clip, from India, 2 runs):
+
+    | | Deepgram (nova-3, multi) | Sarvam (saaras:v3, codemix) |
+    |---|---|---|
+    | Connect (handshake) | **893–1378 ms** (~300 ms round trip) | **157–163 ms** (~40 ms round trip) |
+    | First partial | 1.3 s after first audio, wrongly tagged Persian (`fa`) | none: no partials at all |
+    | Speech end → final | 766–854 ms | 682–700 ms (provider-reported processing 0.05–0.16 s) |
+    | Script | "doctor" in Latin; "दस" vs "10" varies between runs | "डॉक्टर" in Devanagari, "appointment" in Latin |
 - [ ] 0.6 Pipecat basics: run an echo bot over SmallWebRTC; write one custom `FrameProcessor` that logs every frame type passing through it (D-004)
 - [ ] 0.7 Read what Pipecat (and LiveKit) already ship for STT/TTS fallback or service switching. Write down how Swar goes beyond it (C-005)
 
@@ -91,6 +100,8 @@ and eval companies.
 - [ ] 2.5 P50 / P95 / P99 over 30+ turns: **the baseline latency number**
 - [ ] 2.6 Measure time-to-first-token for 2–3 Gemini Flash models and Sarvam's LLM on the same Hinglish prompts; pin the winner's exact model ID (D-015). Measure time to the first *spoken* token, not just the first token: reasoning tokens are silent (C-013)
 - [ ] 2.7 Latency budget: split 800 ms across stages and mark which stage is over budget
+- [ ] 2.8 Measure *true* speech end with Silero VAD instead of "end of the audio file" (C-016), so speech end → final excludes trailing silence in the clip
+- [ ] 2.9 Track connect time and network round trip per provider as separate metrics (C-009); check whether Deepgram offers an endpoint closer to India
 
 **Exit:** baseline P50/P95 recorded. You can point at the slowest stage with evidence.
 **Signals to:** Vapi, Retell, Pipecat, LiveKit, Future AGI, Roark.
