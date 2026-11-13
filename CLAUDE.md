@@ -123,10 +123,14 @@ make down      # stop infra (data kept in Docker volumes)
 cp .env.example .env   # then add API keys
 uv run python scripts/audio_playground.py --record 5 --play   # hear what phone audio does
 uv run python scripts/stream_stt.py --input out/clips/hinglish_booking_16k.wav   # live STT, both providers
+uv run python scripts/parrot_bot.py   # Pipecat parrot bot → open http://localhost:7860 (headphones)
 ```
 
 - Add dependencies with `uv add <pkg>` (or `uv add --dev <pkg>`), never `pip install`. Commit `uv.lock`.
 - Settings come from `swar.config.get_settings()`. Use `settings.require("deepgram_api_key")` for a
   clear error when a key is missing.
+- Pipecat is 1.x (D-017): `PipelineWorker` + `WorkerRunner`, `VADProcessor`, `create_transport`. Check the installed
+  source (`.venv/lib/python3.12/site-packages/pipecat/`) before writing Pipecat code; most online examples are 0.0.x.
+- Test Pipecat processors with `pipecat.tests.utils.run_test` (see `tests/pipeline/`).
 - Architecture rules are enforced as tests in `tests/test_architecture.py`. Add a test when adding a rule.
 - Running the agent and `make eval` are added in Phases 1 and 7.

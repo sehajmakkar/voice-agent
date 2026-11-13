@@ -156,3 +156,11 @@ Every lasting technical decision: tech stack, architecture, interfaces, metrics,
 - **Defaults:** Deepgram `nova-3` with `language=multi`, endpointing 300 ms. Sarvam `saaras:v3`, `mode=codemix`, `hi-IN`. Both are starting points to compare in Phase 4.
 - **Fixtures:** raw provider messages are recorded with `--save-raw` and replayed in tests (principle 8).
 - **Open for 3.1:** a `supports_partials` capability flag (C-014); reconnect/keepalive for warm connections (6.3).
+
+## D-017: Pipecat 1.x, Python capped below 3.14, loose dependency floors
+- **Date:** 2026-11-10 · **Status:** Proposed · **Phase / task:** plan 0.6
+- **Pipecat version:** 1.15.0 (the 1.x API). Most tutorials and blog posts online show the older 0.0.x API, so we follow the **installed source**, not memory or old examples (C-017).
+- **Python:** `requires-python = ">=3.12,<3.14"`. Pipecat can't be resolved for 3.14 yet, and an open-ended range makes uv try to solve for every future Python version. D-002 already targets 3.12.
+- **Dependency floors:** `uv add` writes the *newest* version as the minimum (e.g. `soxr>=1.1.0`), which blocked Pipecat (it needs soxr 1.0). Our own direct dependencies now have deliberately loose floors (`numpy>=1.26`, `soxr>=0.5`, `websockets>=13`). The exact versions are still pinned by `uv.lock`, so builds stay reproducible.
+- **Runner:** for now, bots run under Pipecat's development runner (`pipecat.runner.run.main`, which serves the prebuilt browser client). Our own FastAPI `server.py` (D-010) replaces it once we need our own endpoints.
+- **Revisit if:** Pipecat 2.x lands, or the runner gets in the way of custom endpoints.

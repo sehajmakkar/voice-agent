@@ -120,3 +120,17 @@ Good interview material: "tell me about a hard problem you solved" answers come 
 - **Date:** 2026-11-10 · **Phase / task:** plan 0.5 → 2.8 · **Raised by:** Claude · **Status:** Open
 - **Problem:** the "speech end → final" numbers in 0.5 treat the last frame of the clip as the moment speech ended. TTS clips carry a little trailing silence, so speech really ended earlier and the true latency is somewhat *higher* than reported.
 - **Fix:** in Phase 2, take speech end from Silero VAD on our side (the same signal the agent uses), not from the file length.
+
+## C-017: Pipecat 1.x differs from most examples online; dependency resolution failed twice
+- **Date:** 2026-11-10 · **Phase / task:** plan 0.6 · **Raised by:** found while building · **Status:** Resolved
+- **Problem:** (1) `uv add pipecat-ai` failed: our `requires-python = ">=3.12"` included Python 3.14, which Pipecat doesn't support. (2) It then failed again on `soxr>=1.1.0`, a floor `uv add` had set automatically. (3) Pipecat 1.x renamed core pieces: `PipelineTask`/`PipelineRunner` → `PipelineWorker`/`WorkerRunner`, VAD moved from `TransportParams(vad_analyzer=...)` to a separate `VADProcessor`, and `create_transport()` builds the transport. Code written from older examples would not run.
+- **Resolution:** capped Python at <3.14, loosened our own floors (D-017), and read Pipecat's installed source and its own CLI templates (`pipecat/cli/templates/server/`) for the 1.x structure.
+- **Lesson:** with a fast-moving framework, the installed source is the documentation. Read it before writing code against it.
+
+## C-018: Parrot replay was invisible as "bot speech"; possible self-hearing
+- **Date:** 2026-11-10 · **Phase / task:** plan 0.6 → 1.3 · **Raised by:** found in Sehaj's test logs · **Status:** First part resolved; second open
+- **Problem 1 (resolved):** Sehaj's logs had no `BotStartedSpeakingFrame` at all. Pipecat's output transport only tracks "bot is speaking" for `TTSAudioRawFrame` and `SpeechOutputAudioRawFrame`; a plain `OutputAudioRawFrame` counts as non-speech audio (like a notification sound). Interruption handling depends on knowing the bot is mid-sentence, so this would have silently broken barge-in later.
+- **Fix:** the parrot now emits `SpeechOutputAudioRawFrame`; a test asserts it.
+- **Problem 2 (open):** twice, VAD heard "speech" only ~0.25–0.3 s after the parrot started replaying (16:52:08.4 → 08.8 and 16:52:23.4 → 23.6), producing short ~1.2 s "utterances". Either Sehaj spoke again straight away, or the mic picked up the bot's own playback (echo). The parrot also keeps playing while the user talks, because it has no barge-in.
+- **Update 2026-11-14:** Sehaj was on **laptop speakers**, and noticed the parrot starting to talk right as they paused. So echo is the likely cause: the mic heard the bot's playback and VAD treated it as a new utterance. A real agent on speakers will have the same problem: it can "hear itself" and interrupt or answer itself.
+- **Next step:** in 1.3, test on laptop speakers and headphones, and log `BotStartedSpeakingFrame` next to `VADUserStartedSpeakingFrame`. If they line up, it's echo: rely on browser echo cancellation and treat speech that starts in the first few hundred ms of bot speech with suspicion.

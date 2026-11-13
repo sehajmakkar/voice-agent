@@ -37,7 +37,7 @@ and eval companies.
 **Learn first:** L-001 audio basics, L-004 asyncio & cancellation, L-009 Pipecat frames & processors.
 
 - [x] 0.1 Merge the README eval sections into one metric set; simplify the README; finalise the stack (C-001, D-003)
-- [x] 0.2 Project setup with uv: `pyproject.toml`, ruff, pytest + pytest-asyncio, pre-commit, `src/swar/` layout, `.env.example`, `infra/docker-compose.yml` (Postgres, Jaeger, Grafana). Fill in Commands in CLAUDE.md (D-012, D-014). _(not committed yet)_
+- [x] 0.2 Project setup with uv: `pyproject.toml`, ruff, pytest + pytest-asyncio, pre-commit, `src/swar/` layout, `.env.example`, `infra/docker-compose.yml` (Postgres, Jaeger, Grafana). Fill in Commands in CLAUDE.md (D-012, D-014). (7fb1fb7)
   - [x] 0.2a Start Docker Desktop, run `make up`, and check that Jaeger (:16686) and Grafana (:3000) open and Grafana's Postgres datasource connects
 - [~] 0.3 Get API keys: Sarvam, Deepgram, Cartesia, Gemini. Make a table of free credits, rate limits and supported languages (C-006, D-008). ~~OpenAI~~: no key; dropped (D-015)
   - [x] Keys verified (2026-11-10): Deepgram, Cartesia, Gemini work
@@ -65,7 +65,11 @@ and eval companies.
     | First partial | 1.3 s after first audio, wrongly tagged Persian (`fa`) | none: no partials at all |
     | Speech end → final | 766–854 ms | 682–700 ms (provider-reported processing 0.05–0.16 s) |
     | Script | "doctor" in Latin; "दस" vs "10" varies between runs | "डॉक्टर" in Devanagari, "appointment" in Latin |
-- [ ] 0.6 Pipecat basics: run an echo bot over SmallWebRTC; write one custom `FrameProcessor` that logs every frame type passing through it (D-004)
+- [x] 0.6 Pipecat basics: run an echo bot over SmallWebRTC; write one custom `FrameProcessor` that logs every frame type passing through it (D-004, D-017)
+  - [x] Pipecat 1.15 installed; `swar/pipeline/frame_logger.py` (FrameLogger) and `swar/pipeline/parrot.py` (Parrot: VAD-driven record → replay, with a 0.5 s pre-roll)
+  - [x] `scripts/parrot_bot.py` serves the browser client at http://localhost:7860; processors tested with Pipecat's `run_test` harness (no browser)
+  - [x] Sehaj tested it in Chrome (2026-11-10): 12 utterances of 1.2–8.2 s, no mid-sentence cut-offs, clean shutdown on disconnect. VAD confirmed start after 0.20 s and stop after 0.60 s every time; mic frames at a steady 50/s
+  - [x] Fix from the logs: replay is now `SpeechOutputAudioRawFrame`, so Pipecat knows the bot is speaking (C-018)
 - [ ] 0.7 Read what Pipecat (and LiveKit) already ship for STT/TTS fallback or service switching. Write down how Swar goes beyond it (C-005)
 
 **Exit:** you can explain PCM, frames, sample rates, partial vs final transcripts and Pipecat's frame flow without notes.
@@ -79,7 +83,7 @@ and eval companies.
 
 - [ ] 1.1 Pipeline: SmallWebRTC → Silero VAD → Deepgram or Sarvam STT → Gemini → Cartesia or Sarvam TTS → speaker, served by FastAPI
 - [ ] 1.2 Voice system prompt: short replies, no markdown, numbers and dates spoken naturally, reply in the caller's language mix
-- [ ] 1.3 Default barge-in: TTS stops when the caller speaks. Write down what goes wrong with "haan", "hmm"
+- [ ] 1.3 Default barge-in: TTS stops when the caller speaks. Write down what goes wrong with "haan", "hmm". Also test on laptop speakers, not just headphones: does the bot hear itself? (C-018)
 - [ ] 1.4 Clinic-booking conversation with hardcoded slots (no real tools yet)
 - [ ] 1.5 **Freeze the baseline:** save the exact providers, models and settings in `configs/baseline.yaml`. Never change it afterwards (add new configs instead)
 - [ ] 1.6 Rough latency on 10 turns from logs; write it down
@@ -210,6 +214,7 @@ Comes before turn-taking so that turn-taking work ships with numbers.
 ## Phase 10: Scale, cost & public deployment
 
 - [ ] 10.1 Deploy with Docker Compose on one VM in an India region (D-012); compare latency against running locally (C-009)
+- [ ] 10.2a Lock down the server before it's public: Pipecat's dev runner enables webrtc + telephony + websocket endpoints and allows **all origins** by default. Serve only WebRTC (`-t webrtc` or our own `server.py`), restrict allowed origins, add basic rate limiting
 - [ ] 10.2 Make the browser demo reachable from anywhere: HTTPS (browsers only allow the mic on secure pages) + a TURN server so WebRTC works behind home/office NATs and firewalls (C-011)
 - [ ] 10.3 Load generator: N concurrent AI callers
 - [ ] 10.4 Calls per worker before P95 degrades; measure event-loop lag

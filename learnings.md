@@ -113,7 +113,16 @@ questions it prepares you for, and where to read more (official docs first).
   - How does an interruption propagate through a frame-based pipeline?
   - Why separate data frames from control frames?
   - Where would you put a component that needs to see raw audio *and* transcripts?
-- **References:** Pipecat docs (docs.pipecat.ai): core concepts, custom frame processors
+- **Applied in plan 0.6 (Pipecat 1.15):**
+  - A processor's `process_frame` must call `super().process_frame(...)` first (it handles start/cancel/interruption) and must `push_frame` anything it doesn't mean to swallow. The parrot *swallows* mic audio on purpose so it isn't played straight back.
+  - Silero VAD only confirms speech after `start_secs` (0.2 s) and silence after `stop_secs`. So "user started speaking" arrives late and the first syllable is lost, unless you keep a **pre-roll** of recent audio (the parrot keeps 0.5 s). The true end of speech is `timestamp - stop_secs` on the stop frame.
+  - Some frames are **broadcast** in both directions: Sehaj's logs show `VADUserStartedSpeakingFrame` going ↑ at the first logger and ↓ at the second. That way processors *before* the VAD (e.g. the input side) also learn the user started speaking.
+  - The output transport only treats `TTSAudioRawFrame` / `SpeechOutputAudioRawFrame` as bot speech. Plain `OutputAudioRawFrame` is "other audio", so no `BotStartedSpeakingFrame` and no interruption awareness (C-018).
+  - Frame order is part of the contract: push "user stopped speaking" *before* the reply audio, or downstream logic sees the reply first. A test caught this.
+- **Interview questions (more):**
+  - VAD fires after 200 ms of speech. How do you avoid losing the first word? *(pre-roll / ring buffer)*
+  - How do you unit-test a pipeline stage without real audio or a browser? *(feed synthetic frames through a test harness and assert on the frames that come out)*
+- **References:** Pipecat docs (docs.pipecat.ai): core concepts, custom frame processors · installed source: `pipecat/frames/frames.py`, `pipecat/processors/frame_processor.py`, `pipecat/tests/utils.py`
 
 ## L-010: WebRTC vs WebSockets for realtime audio  `[ ]`
 - **Phase / task:** plan 1.1, 10.2, 12.2
